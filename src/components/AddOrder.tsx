@@ -1,13 +1,65 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useMutation, gql } from "@apollo/client";
 
 export type AppProps = {
   customerId: number;
 };
 
+const GET_DATA = gql`
+  {
+    customers {
+      id
+      name
+      industry
+      orders {
+        id
+        description
+        totalInCents
+      }
+    }
+  }
+`;
+
+const MUTATE_DATA = gql`
+  mutation MUTATE_DATA(
+    $description: String!
+    $totalInCents: Int!
+    $customer: ID
+  ) {
+    createOrder(
+      customer: $customer
+      description: $description
+      totalInCents: $totalInCents
+    ) {
+      order {
+        id
+        customer {
+          id
+        }
+        description
+        totalInCents
+      }
+    }
+  }
+`;
+
 export default function AddOrder({ customerId }: AppProps) {
   const [active, setActive] = useState(false);
   const [description, setDescription] = useState("");
-  const [cost, setCost] = useState<number>(NaN);
+  const [total, setTotal] = useState<number>(NaN);
+
+  const [createOrder, { loading, error, data }] = useMutation(MUTATE_DATA, {
+    refetchQueries: [{ query: GET_DATA }],
+  });
+
+  useEffect(() => {
+    if (data) {
+      console.log(data);
+      setDescription("");
+      setTotal(NaN);
+    }
+  }, [data]);
+
   return (
     <div>
       {active ? null : (
@@ -24,7 +76,14 @@ export default function AddOrder({ customerId }: AppProps) {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              console.log(customerId, description, cost);
+              createOrder({
+                variables: {
+                  customer: customerId,
+                  description: description,
+                  totalInCents: total * 100,
+                },
+              });
+              console.log(customerId, description, total);
             }}
           >
             <div>
@@ -40,13 +99,13 @@ export default function AddOrder({ customerId }: AppProps) {
             </div>
             <br />
             <div>
-              <label htmlFor="cost">Cost: </label>
+              <label htmlFor="total">Total: </label>
               <input
-                id="cost"
+                id="total"
                 type="number"
-                value={isNaN(cost) ? "" : cost}
+                value={isNaN(total) ? "" : total}
                 onChange={(e) => {
-                  setCost(parseFloat(e.target.value));
+                  setTotal(parseFloat(e.target.value));
                 }}
               />
             </div>
@@ -55,8 +114,9 @@ export default function AddOrder({ customerId }: AppProps) {
               Add Customer
             </button>
             {createCustomerError ? <p>Error creating customer</p> : null} */}
-            <button>Add Order</button>
+            <button disabled={loading ? true : false}>Add Order</button>
           </form>
+          {error ? <p>Something went wrong</p> : null}
         </div>
       ) : null}
     </div>
